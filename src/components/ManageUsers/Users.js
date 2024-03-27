@@ -1,284 +1,205 @@
-import Modal from "react-bootstrap/Modal";
-import Button from "react-bootstrap/Button";
-import { useState, useEffect } from "react";
-import {
-  fetchGroup,
-  createNewUser,
-  updateCurrentUser,
-} from "../../services/userService";
+import { useEffect, useState } from "react";
+import "./Users.scss";
+import { fetchAllUsers, deleteUser } from "../../services/userService";
+import ReactPaginate from "react-paginate";
 import { toast } from "react-toastify";
-import _ from "lodash";
+import ModalDelete from "./ModalDelete";
+import ModalUser from "./ModalUser";
 
-const ModalUser = (props) => {
-  const { action, dataModalUser } = props;
-  const defaultUserData = {
-    email: "",
-    phone: "",
-    username: "",
-    password: "",
-    address: "",
-    sex: "",
-    group: "",
+const Users = (props) => {
+  const [listUsers, setListUsers] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [currentLimit, setCurrentLimit] = useState(2);
+  const [totalPages, setTotalPages] = useState(0);
+  // modal delete
+  const [isShowModalDelete, setIsShowModalDelete] = useState(false);
+  const [dataModal, setDataModal] = useState({});
+  // modal update/create user
+  const [isShowModalUser, setIsShowModalUser] = useState(false);
+  const [actionModalUser, setActionModalUser] = useState("CREATE");
+  const [dataModalUser, setDataModalUser] = useState({});
+
+  useEffect(() => {
+    fetchUsers();
+  }, [currentPage]);
+
+  const fetchUsers = async () => {
+    let response = await fetchAllUsers(currentPage, currentLimit);
+
+    if (response && response.EC === 0) {
+      console.log(response.DT);
+      setTotalPages(response.DT.totalPages);
+      setListUsers(response.DT.users);
+    }
   };
 
-  const validInputsDefault = {
-    email: true,
-    phone: true,
-    username: true,
-    password: true,
-    address: true,
-    sex: true,
-    group: true,
+  const handlePageClick = async (event) => {
+    setCurrentPage(+event.selected + 1);
   };
 
-  const [userData, setUserData] = useState(defaultUserData);
-  const [validInputs, setValidInputs] = useState(validInputsDefault);
+  const handleDeleteUser = async (user) => {
+    setDataModal(user);
+    setIsShowModalDelete(true);
+  };
 
-  const [userGroups, setUserGroups] = useState([]);
+  const handleClose = () => {
+    setIsShowModalDelete(false);
+    setDataModal({});
+  };
 
-  useEffect(() => {
-    getGroups();
-  }, []);
-
-  useEffect(() => {
-    if (action === "UPDATE") {
-      setUserData({
-        ...dataModalUser,
-        group: dataModalUser.Group ? dataModalUser.Group.id : "",
-      });
-    }
-  }, [dataModalUser]);
-
-  useEffect(() => {
-    if (action === "CREATE") {
-      if (userGroups && userGroups.length > 0) {
-        setUserData({ ...userData, group: userGroups[0].id });
-      }
-    }
-  }, [action]);
-
-  const getGroups = async () => {
-    let res = await fetchGroup();
-    if (res && res.EC === 0) {
-      setUserGroups(res.DT);
-      if (res.DT && res.DT.length > 0) {
-        let groups = res.DT;
-        setUserData({ ...userData, group: groups[0].id });
-      }
+  const confirmDeleteUser = async () => {
+    let response = await deleteUser(dataModal);
+    console.log(">>Check response: ", response);
+    if (response && response.EC === 0) {
+      toast.success(response.EM);
+      await fetchUsers();
+      setIsShowModalDelete(false);
     } else {
-      toast.error(res.EM);
+      toast.error(response.EM);
     }
   };
 
-  const handleOnChangeInput = (value, name) => {
-    let _userData = _.cloneDeep(userData);
-    _userData[name] = value;
-    setUserData(_userData);
+  const onHideModalUser = async () => {
+    setIsShowModalUser(false);
+    setDataModalUser({});
+    await fetchUsers();
   };
 
-  const checkValidateInputs = () => {
-    // create user
-    if (action === "UPDATE") return true;
-    setValidInputs(validInputsDefault);
-    let arr = ["email", "phone", "password", "group"];
-    let check = true;
-    for (let i = 0; i < arr.length; i++) {
-      if (!userData[arr[i]]) {
-        let _validInputs = _.cloneDeep(validInputsDefault);
-        _validInputs[arr[i]] = false;
-        setValidInputs(_validInputs);
-
-        toast.error(`Empty input ${arr[i]}`);
-        check = false;
-        break;
-      }
-    }
-
-    return check;
+  const handleEditUser = (user) => {
+    setActionModalUser("UPDATE");
+    setDataModalUser(user);
+    setIsShowModalUser(true);
   };
 
-  const handleConfirmUser = async () => {
-    // create user
-    let check = checkValidateInputs();
-    if (check === true) {
-      let res =
-        action === "Create"
-          ? await createNewUser({
-              ...userData,
-              groupId: userData["group"],
-            })
-          : await updateCurrentUser({
-              ...userData,
-              groupId: userData["group"],
-            });
-      if (res && res.EC === 0) {
-        props.onHide();
-        setUserData({
-          ...defaultUserData,
-          group: userGroups && userGroups.length > 0 ? userGroups[0].id : "",
-        });
-      } else {
-        toast.error(res.EM);
-        let _validInputs = _.cloneDeep(validInputsDefault);
-        _validInputs[res.DT] = false;
-        setValidInputs(_validInputs);
-      }
-    }
-  };
-
-  const handleCloseModalUser = () => {
-    props.onHide();
-    setUserData(defaultUserData);
-    setValidInputs(validInputsDefault);
+  const handleRefresh = async () => {
+    await fetchUsers();
   };
 
   return (
     <>
-      <Modal
-        size="lg"
-        show={props.show}
-        className="modal-user"
-        onHide={() => handleCloseModalUser()}
-      >
-        <Modal.Header closeButton>
-          <Modal.Title id="contained-modal-title-vcenter">
-            <span>
-              {props.action === "CREATE" ? "Create new user" : "Edit a user"}
-            </span>
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="content-body row">
-            <div className="col-12 col-sm-6 form-group">
-              <label>
-                Email Address (<span className="red">*</span>):
-              </label>
-              <input
-                disabled={action === "CREATE" ? false : true}
-                className={
-                  validInputs.email ? "form-control" : "form-control is-invalid"
-                }
-                type="email"
-                value={userData.email}
-                onChange={(event) =>
-                  handleOnChangeInput(event.target.value, "email")
-                }
-              />
+      <div className="container">
+        <div className="manage-user-container">
+          <div className="user-header">
+            <div className="title mt-3">
+              <h3>Manage Users</h3>
             </div>
-            <div className="col-12 col-sm-6 form-group">
-              <label>
-                Phone Number (<span className="red">*</span>):
-              </label>
-              <input
-                disabled={action === "CREATE" ? false : true}
-                className={
-                  validInputs.phone ? "form-control" : "form-control is-invalid"
-                }
-                type="text"
-                value={userData.phone}
-                onChange={(event) =>
-                  handleOnChangeInput(event.target.value, "phone")
-                }
-              />
-            </div>
-
-            <div className="col-12 col-sm-6 form-group">
-              <label>Username:</label>
-              <input
-                className="form-control"
-                type="text"
-                value={userData.username}
-                onChange={(event) =>
-                  handleOnChangeInput(event.target.value, "username")
-                }
-              />
-            </div>
-
-            <div className="col-12 col-sm-6 form-group">
-              {action === "CREATE" && (
-                <>
-                  <label>
-                    Password (<span className="red">*</span>):
-                  </label>
-                  <input
-                    className={
-                      validInputs.password
-                        ? "form-control"
-                        : "form-control is-invalid"
-                    }
-                    type="password"
-                    value={userData.password}
-                    onChange={(event) =>
-                      handleOnChangeInput(event.target.value, "password")
-                    }
-                  />
-                </>
-              )}
-            </div>
-
-            <div className="col-12 col-sm-12 form-group">
-              <label>Address:</label>
-              <input
-                className="form-control"
-                type="text"
-                value={userData.address}
-                onChange={(event) =>
-                  handleOnChangeInput(event.target.value, "address")
-                }
-              />
-            </div>
-
-            <div className="col-12 col-sm-6 form-group">
-              <label>Gender:</label>
-              <select
-                className="form-select"
-                onChange={(event) =>
-                  handleOnChangeInput(event.target.value, "sex")
-                }
-                value={userData.sex}
+            <div className="actions my-3">
+              <button
+                className="btn btn-success refresh"
+                onClick={() => handleRefresh()}
               >
-                <option defaultValue="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <div className="col-12 col-sm-6 form-group">
-              <label>
-                Group (<span className="red">*</span>):
-              </label>
-              <select
-                className={
-                  validInputs.group ? "form-select" : "form-select is-invalid"
-                }
-                onChange={(event) =>
-                  handleOnChangeInput(event.target.value, "group")
-                }
-                value={userData.group}
+                <i class="fa fa-refresh"></i>
+                Refresh
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setIsShowModalUser(true);
+                  setActionModalUser("CREATE");
+                }}
               >
-                {userGroups.length > 0 &&
-                  userGroups.map((item, index) => {
-                    return (
-                      <option key={`group-${index}`} value={item.id}>
-                        {item.name}
-                      </option>
-                    );
-                  })}
-              </select>
+                <i class="fa fa-plus-circle"></i>
+                Add New User
+              </button>
             </div>
           </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => handleCloseModalUser()}>
-            Close
-          </Button>
-          <Button variant="primary" onClick={() => handleConfirmUser()}>
-            {action === "CREATE" ? "Save" : "Update"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          <div className="user-body">
+            <table className="table table-bordered table-hover">
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Id</th>
+                  <th scope="col">Email</th>
+                  <th scope="col">Username</th>
+                  <th scope="col">Group</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {listUsers && listUsers.length > 0 ? (
+                  <>
+                    {listUsers.map((item, index) => {
+                      return (
+                        <tr key={`row-${index}`}>
+                          <td>
+                            {(currentPage - 1) * currentLimit + index + 1}
+                          </td>
+                          <td>{item.id}</td>
+                          <td>{item.email}</td>
+                          <td>{item.username}</td>
+                          <td>{item.Group ? item.Group.name : ""}</td>
+                          <td>
+                            <span
+                              title="Edit"
+                              className="edit"
+                              onClick={() => handleEditUser(item)}
+                            >
+                              <i className="fa fa-pencil"></i>
+                            </span>
+                            <span
+                              title="Delete"
+                              className="delete"
+                              onClick={() => handleDeleteUser(item)}
+                            >
+                              <i class="fa fa-trash"></i>
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </>
+                ) : (
+                  <>
+                    <tr>
+                      <td>Not Found User</td>
+                    </tr>
+                  </>
+                )}
+              </tbody>
+            </table>
+          </div>
+          {totalPages > 0 && (
+            <div className="user-footer">
+              <ReactPaginate
+                nextLabel="next >"
+                onPageChange={handlePageClick}
+                pageRangeDisplayed={3}
+                marginPagesDisplayed={2}
+                pageCount={totalPages}
+                previousLabel="< previous"
+                pageClassName="page-item"
+                pageLinkClassName="page-link"
+                previousClassName="page-item"
+                previousLinkClassName="page-link"
+                nextClassName="page-item"
+                nextLinkClassName="page-link"
+                breakLabel="..."
+                breakClassName="page-item"
+                breakLinkClassName="page-link"
+                containerClassName="pagination"
+                activeClassName="active"
+                renderOnZeroPageCount={null}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <ModalDelete
+        show={isShowModalDelete}
+        handleClose={handleClose}
+        confirmDeleteUser={confirmDeleteUser}
+        dataModal={dataModal}
+      />
+
+      <ModalUser
+        show={isShowModalUser}
+        onHide={onHideModalUser}
+        action={actionModalUser}
+        dataModalUser={dataModalUser}
+      />
     </>
   );
 };
 
-export default ModalUser;
+export default Users;

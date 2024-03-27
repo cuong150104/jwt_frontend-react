@@ -1,36 +1,25 @@
 import "./App.scss";
 import Nav from "./components/Navigation/Nav";
-import { BrowserRouter as Router, Route, Switch } from 'react-router-dom'
-
+import { BrowserRouter as Router } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
-import 'react-toastify/dist/ReactToastify.css';
 import { useEffect, useState } from "react";
-import AppRoutes from './routes/AppRoutes';
+import AppRoutes from "./routes/AppRoutes";
+
 function App() {
-  const [account, setAccount] = useState({});
-
-  useEffect(() => {
-    let session = sessionStorage.getItem('account');
-    if (session) {
-      setAccount(JSON.parse(session));
-    }
-  }, []);// chay 1 lan
-
   return (
     <>
       <Router>
-        <div className='app-header'>
+        <div className="app-header">
           <Nav />
         </div>
-        <div className="app-container">
+
+        <div className="app-contanier">
           <AppRoutes />
         </div>
-
       </Router>
-
       <ToastContainer
-        position="top-right"
-        autoClose={5000}
+        position="bottom-center"
+        autoClose={3000}
         hideProgressBar={false}
         newestOnTop={false}
         closeOnClick
